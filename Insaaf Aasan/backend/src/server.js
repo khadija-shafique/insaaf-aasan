@@ -10,7 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:5173",
-  "https://frontend-1c9zvg5yb-khadija8.vercel.app",
+  "https://insaaf-aasan.vercel.app",
 ];
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS.join(","))
   .split(",")
