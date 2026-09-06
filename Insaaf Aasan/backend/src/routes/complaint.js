@@ -3,6 +3,22 @@ const router = express.Router();
 const aiService = require("../services/aiService");
 const legalDb = require("../services/legalDb");
 
+const MAX_TEXT_LENGTH = 4000;
+const MAX_CONVERSATION_MESSAGES = 32;
+const VALID_LANGUAGES = new Set(["auto", "en", "ur", "roman-ur"]);
+
+function isValidConversationMessage(message) {
+  return (
+    message &&
+    typeof message === "object" &&
+    !Array.isArray(message) &&
+    (message.role === "user" || message.role === "assistant") &&
+    typeof message.content === "string" &&
+    message.content.trim().length > 0 &&
+    message.content.length <= MAX_TEXT_LENGTH
+  );
+}
+
 /**
  * POST /api/analyze
  *
@@ -28,13 +44,37 @@ router.post("/analyze", async (req, res) => {
       });
     }
 
+    if (text.trim().length > MAX_TEXT_LENGTH) {
+      return res.status(400).json({
+        error: `Message text must not exceed ${MAX_TEXT_LENGTH} characters.`,
+      });
+    }
+
+    if (language !== undefined && (!VALID_LANGUAGES.has(language))) {
+      return res.status(400).json({
+        error: "language must be auto, en, ur, or roman-ur.",
+      });
+    }
+
     if (conversation !== undefined && !Array.isArray(conversation)) {
       return res.status(400).json({
         error: "conversation must be an array of { role, content } messages.",
       });
     }
 
-    const result = await aiService.analyze(text, language || "auto", {
+    if (conversation && conversation.length > MAX_CONVERSATION_MESSAGES) {
+      return res.status(400).json({
+        error: `conversation must not exceed ${MAX_CONVERSATION_MESSAGES} messages.`,
+      });
+    }
+
+    if (conversation && !conversation.every(isValidConversationMessage)) {
+      return res.status(400).json({
+        error: "Each conversation message requires a user or assistant role and non-empty text.",
+      });
+    }
+
+    const result = await aiService.analyze(text.trim(), language || "auto", {
       conversation: conversation || [],
     });
 
