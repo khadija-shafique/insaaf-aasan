@@ -1,225 +1,347 @@
-# Insaaf Aasan — انصاف آسان
+# Insaaf Aasan — AI-Powered Legal Complaint Assistant
 
-**AI-powered legal guidance and complaint drafting for Pakistani citizens.**
+**Aapka Haq, Aapki Awaz — Your Right, Your Voice**
 
-Insaaf Aasan is a conversational legal assistant that helps users understand their rights and prepare structured complaint drafts under Pakistani law. Users can describe their problem in **Urdu, Roman Urdu, or English**; the assistant asks targeted follow-up questions, classifies the issue into the correct legal category, explains relevant laws in plain language, and generates a ready-to-use complaint draft.
+Insaaf Aasan is an AI-powered legal complaint assistant designed to make legal information more accessible to people in Pakistan. It helps users describe incidents in Urdu, Roman Urdu, or English and organizes their complaints into a structured format with potentially relevant legal information.
 
-> **Disclaimer:** Insaaf Aasan provides general legal information only. It does not constitute legal advice. Always consult a qualified lawyer for your specific situation.
+The project combines a React frontend, a Node.js and Express backend, Google's Gemini AI, and Retrieval-Augmented Generation (RAG) to help users navigate legal information more easily.
 
----
+**GitHub Repository:** [khadija-shafique/insaaf-aasan](https://github.com/khadija-shafique/insaaf-aasan)
 
-## Project Description
+## Table of Contents
 
-Insaaf Aasan is a full-stack web application built for Pakistan's legal context. It combines a React frontend with an Express backend running a deterministic, rule-based conversation engine. The engine classifies user input into one of eight curated legal categories (theft, fraud, breach of trust, intimidation, harassment, cyberstalking, online scams, and lost property), collects the facts needed for a real complaint, and produces a structured draft with legal references and next steps.
+- [Problem Statement](#problem-statement)
+- [Key Features](#key-features)
+- [How It Works](#how-it-works)
+- [Technology Stack](#technology-stack)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Environment Variables](#environment-variables)
+- [Running the Application](#running-the-application)
+- [Deployment](#deployment)
+- [Limitations](#limitations)
+- [Future Improvements](#future-improvements)
+- [Disclaimer](#disclaimer)
 
----
+## Problem Statement
 
-## Features
+Understanding legal rights and preparing a clear complaint can be challenging for people unfamiliar with legal terminology. Language barriers and difficulty finding relevant legal information can make the process even harder.
 
-- **Multilingual intake** — Accepts English, Roman Urdu, and Urdu-script input with auto language detection.
-- **Confidence-scored classification** — 8 curated legal categories with disambiguation for ambiguous cases.
-- **Guided conversation** — Asks only the facts needed for each category; vague replies are re-asked once, "I don't know" is recorded as *Not known*.
-- **Structured complaint draft** — Generates a formatted draft with date, authority, subject, body, facts, evidence list, and signature placeholder.
-- **Legal references & next steps** — Shows applicable PPC / PECA 2016 sections and practical next steps.
-- **Trusted official sources** — Links only to verified Pakistani government sources.
-- **Copy draft** — One-click copy of the final complaint text.
-- **Dark walnut law-library UI** — Custom single-page design with gold accents and responsive layout.
+Insaaf Aasan aims to simplify this process by allowing users to explain an incident in their own words and helping them organize their complaint while locating potentially relevant information from a curated knowledge base.
 
----
+## Key Features
 
-## Legal Categories
+- **Multilingual complaints:** Accepts user input in Urdu, Roman Urdu, and English.
+- **Complaint structuring:** Helps transform an unstructured description into a clearer complaint.
+- **AI-assisted processing:** Integrates Google Gemini for configured text-generation tasks.
+- **RAG-based retrieval:** Searches a curated knowledge base for potentially relevant legal information.
+- **Legal information support:** Provides relevant material when suitable knowledge-base content is available.
+- **Fallback handling:** Uses alternative response behavior when retrieval confidence is insufficient or AI generation fails.
+- **Web-based interface:** Provides a user-friendly way to submit complaints and view results.
+- **Modular architecture:** Keeps the frontend, backend, retrieval logic, and AI integration separated.
 
-| # | Category | Law Reference |
-|---|----------|---------------|
-| 1 | Theft | PPC §§ 378–382 |
-| 2 | Fraud / Cheating | PPC §§ 415, 420 |
-| 3 | Criminal Breach of Trust | PPC §§ 405–409 |
-| 4 | Criminal Intimidation / Threats | PPC §§ 503, 506 |
-| 5 | Harassment | PEHA Act 2010; PPC § 509 |
-| 6 | Cyberstalking / Online Harassment | PECA 2016 §§ 20–24 |
-| 7 | Online Scam | PECA 2016 § 14; PPC § 420 |
-| 8 | Lost Property / Documents | Loss report workflow (FIR only if theft alleged) |
+## How It Works
 
----
+1. **Complaint submission:** The user describes an incident in Urdu, Roman Urdu, or English.
+2. **Backend processing:** The frontend sends the request to the backend API.
+3. **Knowledge retrieval:** The RAG component searches the available legal knowledge base.
+4. **AI processing:** Gemini assists with configured text-generation or response-polishing tasks.
+5. **Fallback handling:** If no sufficiently confident retrieval match is found, or AI generation fails, the application follows its configured fallback behavior.
+6. **Response delivery:** The backend returns the processed result for display in the frontend.
 
-## Tech Stack
+The exact response depends on the available source material, retrieval confidence, and the availability of the configured AI service.
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | React 19 + Vite |
-| Styling | Vanilla CSS with custom properties (dark walnut / gold theme) |
-| Backend | Node.js + Express |
-| Engine | Deterministic rule-based conversation engine (provider-agnostic) |
-| Tests | Node.js built-in test runner (`node --test`) |
+## Technology Stack
 
----
+| Component | Technology |
+|---|---|
+| Frontend | React 19 |
+| Frontend tooling | Vite |
+| Routing | React Router |
+| Backend runtime | Node.js |
+| Backend framework | Express.js |
+| AI integration | Google Gemini API |
+| RAG embeddings | Gemini Embedding API |
+| Backend configuration | dotenv |
+| Cross-origin requests | CORS |
+| Testing | Node.js built-in test runner |
+| Backend hosting | Render |
 
 ## Project Structure
 
-```
-backend/
-├── src/
-│   ├── data/
-│   │   ├── legal_categories.json    # 8 categories, laws, next steps
-│   │   └── trusted_sources.json     # verified government sources
-│   ├── routes/complaint.js          # /api/analyze, /api/health, /api/categories, /api/sources
-│   ├── services/
-│   │   ├── classification.js        # conversation engine
-│   │   ├── fieldDetectors.js        # required fields + detectors per category
-│   │   ├── synonyms.js              # spelling variants, letter-collapse, fuzzy matching
-│   │   ├── draftBuilder.js          # structured complaint draft
-│   │   ├── legalDb.js               # curated knowledge base access
-│   │   ├── aiService.js             # provider selection
-│   │   └── providers/
-│   │       ├── mock.js              # rule-based engine (default)
-│   │       ├── alibaba.js           # stub for future RAG provider
-│   │       └── index.js
-│   └── server.js
-├── test/
-│   ├── engine.test.js               # 47 engine + classification tests
-│   ├── fallback.test.js             # official-source fallback tests
-│   └── relationships.test.js        # relationship extraction tests
-└── package.json
+The repository separates the frontend from the current backend implementation.
 
-frontend/
-├── src/
-│   ├── App.jsx                      # single-page app with chat modal
-│   ├── index.css                    # dark walnut theme
-│   ├── main.jsx                     # React entry
-│   ├── services/api.js              # API client
-│   ├── assets/                      # app-logo.png, lady-justice.png, hero.png
-│   ├── components/                  # old reusable components (kept for reference)
-│   ├── pages/                       # old page components (kept for reference)
-│   ├── hooks/                       # useComplaintAnalysis hook
-│   └── data/                        # frontend mirrors of backend data
-├── public/
-│   ├── favicon.svg
-│   └── library-bg.jpg
-├── index.html
-├── vite.config.js
-└── package.json
+```text
+insaaf-aasan/
+├── frontend/
+│   ├── src/
+│   ├── public/
+│   ├── package.json
+│   └── vite.config.js
+│
+├── backend/
+│   └── ...                  # Older backend version
+│
+├── backend1/
+│   ├── src/
+│   │   ├── server.js
+│   │   └── services/
+│   │       ├── rag/
+│   │       │   └── embedder.js
+│   │       └── providers/
+│   │           └── gemini.js
+│   ├── scripts/
+│   │   └── buildIndex.js
+│   ├── package.json
+│   └── .env.example
+│
+└── README.md
 ```
 
----
+*Note: This is a simplified representation. Some files and directories have been omitted. `backend1` is the updated backend directory used for deployment.*
 
 ## Getting Started
 
-Requires Node.js 18+.
+### Prerequisites
 
-### Backend (port 3001)
+Install the following before running the project:
+
+- [Node.js](https://nodejs.org/)
+- npm, included with Node.js
+- [Git](https://git-scm.com/)
+- A Google Gemini API key for AI functionality
+
+### 1. Clone the Repository
+
+Open a terminal and run:
 
 ```bash
-cd backend
-npm install
-npm run dev        # or: npm start
+git clone https://github.com/khadija-shafique/insaaf-aasan.git
+cd insaaf-aasan
 ```
 
-### Frontend (port 5173)
+### 2. Install Backend Dependencies
+
+Navigate to the updated backend directory:
+
+```bash
+cd backend1
+npm install
+```
+
+Create a `.env` file inside `backend1`, using `.env.example` as a reference if it is available.
+
+Add the required environment variables before starting the server.
+
+### 3. Install Frontend Dependencies
+
+Open a second terminal in the project root and run:
 
 ```bash
 cd frontend
 npm install
+```
+
+### 4. Start the Backend
+
+In the terminal opened inside `backend1`, run:
+
+```bash
 npm run dev
 ```
 
-Open `http://localhost:5173`.
+This starts the backend using Node.js watch mode and the `src/server.js` entry point.
 
-The Vite dev server proxies `/api` requests to the backend on port 3001.
-
-### Tests
+For production-style startup, use:
 
 ```bash
-cd backend
-npm test           # 47 tests
+npm start
 ```
 
----
+Do not run both commands against the same port at the same time.
+
+### 5. Start the Frontend
+
+In the second terminal, navigate to `frontend` and run:
+
+```bash
+npm run dev
+```
+
+Vite will print a local URL in the terminal. Open that URL in your browser.
+
+Ensure the frontend is configured to send API requests to the running backend.
 
 ## Environment Variables
 
-Create `backend/.env` from `backend/.env.example`:
+The backend uses environment variables for Gemini integration and other runtime configuration.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3001` | Backend port |
-| `AI_PROVIDER` | `mock` | `mock` (rule-based) or `alibaba` (stub) |
-| `DASHSCOPE_API_KEY` | — | Reserved for future RAG provider |
+Example configuration:
 
----
+```env
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=your_supported_gemini_model
+GEMINI_EMBED_MODEL=gemini-embedding-001
+```
+
+### Variable Reference
+
+| Variable | Purpose |
+|---|---|
+| `GEMINI_API_KEY` | Authenticates requests to Google Gemini services. |
+| `GEMINI_MODEL` | Specifies the configured Gemini text-generation model. |
+| `GEMINI_EMBED_MODEL` | Specifies the model used to generate embeddings for retrieval. |
+
+Use the actual supported model names configured for your project. Check `backend1/.env.example` and the source code for required variables and defaults.
+
+**Security guidelines:**
+
+- Never commit `.env` files containing API keys.
+- Never expose private API keys in frontend code.
+- Store production secrets in the hosting provider's environment settings.
+- If an API key becomes public, revoke it and generate a replacement.
+
+## Running the Application
+
+### Frontend Development Server
+
+From the `frontend` directory:
+
+```bash
+npm run dev
+```
+
+### Frontend Production Build
+
+From the `frontend` directory:
+
+```bash
+npm run build
+```
+
+Vite generates the production build in the `dist` directory.
+
+### Frontend Preview
+
+After building, you can preview the production build locally:
+
+```bash
+npm run preview
+```
+
+### Backend Development Server
+
+From the `backend1` directory:
+
+```bash
+npm run dev
+```
+
+### Backend Production Start
+
+```bash
+npm start
+```
+
+### Backend Tests
+
+```bash
+npm test
+```
+
+This executes the tests discovered by Node.js's built-in test runner.
+
+### Build the RAG Index
+
+The backend defines a script for building the RAG index:
+
+```bash
+npm run rag:index
+```
+
+Run this command when required by your knowledge-base setup or after relevant source data changes. Confirm the expected input files and output locations in `backend1/scripts/buildIndex.js` before using it.
 
 ## Deployment
 
-Recommended production layout:
+The frontend and backend are deployed as separate application components.
 
-| Service | Platform | Why |
-|---------|----------|-----|
-| Frontend | Vercel | Fast static hosting, free tier |
-| Backend | Oracle Cloud Free Tier / Render / Railway | Long-running Node.js process |
-| Database | JSON files (now) → PostgreSQL/Supabase (later) | Keep it simple at first |
+### Backend Deployment on Render
 
-### Why separate frontend and backend?
+The updated backend uses the `backend1` directory.
 
-The backend must stay running for the conversation engine and for future WhatsApp Business API webhooks. Vercel is ideal for the static frontend but not for a persistent backend process.
+Configure the Render service with the following settings:
 
-### Free, always-on backend option
+| Setting | Value |
+|---|---|
+| Root Directory | `backend1` |
+| Build Command | `npm install` |
+| Start Command | `npm start` |
 
-**Oracle Cloud Free Tier** gives you 2 always-free Compute VMs that never sleep. This is the best free option if you want fast responses and plan to add WhatsApp integration later.
+Deployment steps:
 
-### Wiring
+1. Connect the GitHub repository to Render.
+2. Select the backend web service.
+3. Set the Root Directory to `backend1`.
+4. Configure the build and start commands shown above.
+5. Add the required environment variables in Render.
+6. Deploy the service.
+7. Check the deployment logs to confirm that the server starts successfully.
 
-Set this environment variable in Vercel:
+When updating the backend, ensure Render deploys the latest code from `backend1`, rather than the older `backend` directory.
 
-```
-VITE_API_URL=https://your-backend-url/api
-```
+### Frontend Deployment
 
----
+Deploy the `frontend` directory using a hosting provider that supports React and Vite.
 
-## Future Roadmap
+Before deploying:
 
-- [ ] WhatsApp Business API integration (`POST /webhook`)
-- [ ] User accounts and saved drafts
-- [ ] Move curated JSON data to PostgreSQL/Supabase
-- [ ] RAG-based AI provider (Alibaba Cloud Model Studio)
-- [ ] Urdu-script complaint drafts
+- Ensure the production build succeeds.
+- Configure the frontend to use the deployed backend API URL.
+- Verify that the backend permits requests from the frontend's origin if cross-origin requests are used.
+- Confirm that no private credentials are included in the frontend build.
 
----
+The exact frontend API configuration variable depends on the implementation in the repository.
 
-## API
+## Limitations
 
-### `POST /api/analyze`
+- The quality of responses depends on the accuracy and coverage of the legal knowledge base.
+- Relevant information may not be retrieved for ambiguous or unusual complaints.
+- AI-generated explanations can contain errors and should be checked against authoritative sources.
+- Gemini availability, rate limits, or temporary service errors may affect AI-powered features.
+- Legal information must be maintained as applicable laws and procedures change.
+- The application does not replace a lawyer or an official government service.
 
-One conversational turn. `conversation` contains only prior messages.
+## Future Improvements
 
-```json
-{
-  "text": "Mera phone chori ho gaya",
-  "language": "auto",
-  "conversation": [
-    { "role": "user", "content": "..." },
-    { "role": "assistant", "content": "..." }
-  ]
-}
-```
+Potential improvements include:
 
-When `needs_follow_up` becomes `false`, the response includes a structured `draft`, `next_steps`, and `sources`.
-
-Other endpoints: `GET /api/categories`, `GET /api/sources`, `GET /api/health`.
-
----
-
-## Test Suite
-
-`backend/test/` contains 47 tests covering classification, intake flows, disambiguation, spelling variants, loss-vs-theft resolution, official-source fallback, and relationship extraction.
-
----
+- Expanding and regularly updating the verified legal knowledge base.
+- Providing clearer citations and links to authoritative legal sources.
+- Improving retrieval accuracy and confidence calibration.
+- Strengthening support for Urdu, Roman Urdu, and English.
+- Adding automated tests for complaint processing, retrieval, and fallback behavior.
+- Improving error reporting and service monitoring.
+- Strengthening privacy and security for user-submitted complaints.
+- Improving accessibility and usability across desktop and mobile devices.
 
 ## Disclaimer
 
-Insaaf Aasan provides general legal information only. It does not constitute legal advice. Always consult a qualified lawyer for your specific situation.
+Insaaf Aasan is an AI-assisted legal-information and complaint-structuring project. It is intended to help users organize their concerns and find potentially relevant information.
 
----
+It does not guarantee the accuracy or completeness of legal information, replace professional legal advice, or represent an official government service. Users should verify important legal matters with authoritative sources or a qualified legal professional.
 
-## License
+## Contributing
 
-MIT
+Contributions that improve usability, accessibility, testing, retrieval quality, and the reliability of legal references are welcome.
+
+Before submitting changes:
+
+1. Test the changes locally.
+2. Keep API keys and other secrets out of version control.
+3. Document any new environment variables or setup requirements.
+4. Ensure the frontend and backend remain compatible.
+5. Submit changes through a pull request.
+
+## Project Goal
+
+Insaaf Aasan aims to make legal information easier to approach by helping people express their complaints clearly and discover potentially relevant information in a language they understand.
