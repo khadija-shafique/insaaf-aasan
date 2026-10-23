@@ -4,10 +4,6 @@
  * and only asks Gemini to rewrite the final message more naturally.
  * Never lets Gemini invent laws, authorities, or facts — it only rewords
  * what the rule-based engine already determined to be true.
- *
- * AI calls try several Gemini models first (with retry on 503/429), then
- * fall back to Groq models. If everything fails, the original message is
- * used, so the app never breaks because of the AI call.
  */
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
@@ -19,108 +15,7 @@ const { buildDraft } = require("../draftBuilder");
 const officialSourceFallback = require("../officialSourceFallback");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-const splitList = (value) =>
-  value
-    .split(",")
-    .map((m) => m.trim())
-    .filter(Boolean);
-
-// Comma-separated lists, tried in order. GEMINI_MODEL (single) still works
-// as a fallback if GEMINI_MODELS is not set.
-const GEMINI_MODELS = splitList(
-  process.env.GEMINI_MODELS ||
-    process.env.GEMINI_MODEL ||
-    "gemini-3.8-flash,gemini-3.7-flash,gemini-flash-lite-latest"
-);
-
-const GROQ_MODELS = splitList(
-  process.env.GROQ_MODELS || "llama-3.3-70b-versatile,llama-3.1-8b-instant"
-);
-
-/**
- * Try each Gemini model in order. Retries a model on 503/429 with backoff,
- * skips to the next model on 404. Returns text, or null if all fail.
- */
-async function tryGemini(prompt) {
-  if (!process.env.GEMINI_API_KEY) return null;
-
-  for (const name of GEMINI_MODELS) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const m = genAI.getGenerativeModel({ model: name });
-        const r = await m.generateContent(prompt);
-        const text = r.response.text().trim();
-        if (text) {
-          console.log(`[gemini] success with ${name}`);
-          return text;
-        }
-        break; // empty response: try next model
-      } catch (err) {
-        const msg = String(err);
-        if (/404/.test(msg)) {
-          console.warn(`[gemini] ${name} unavailable, trying next model`);
-          break;
-        }
-        if (/503|429/.test(msg)) {
-          console.warn(`[gemini] ${name} busy (attempt ${attempt + 1})`);
-          await sleep(500 * 2 ** attempt);
-          continue;
-        }
-        console.warn(`[gemini] ${name} failed: ${err.message}`);
-        break;
-      }
-    }
-  }
-  return null;
-}
-
-/**
- * Try each Groq model in order (OpenAI-compatible API).
- * Returns text, or null if all fail or no key is set.
- */
-async function tryGroq(prompt) {
-  if (!process.env.GROQ_API_KEY) return null;
-
-  for (const name of GROQ_MODELS) {
-    try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: name,
-          messages: [{ role: "user", content: prompt }],
-          temperature: 0.3,
-        }),
-      });
-
-      if (!res.ok) {
-        console.warn(`[groq] ${name} failed: ${res.status}`);
-        continue;
-      }
-
-      const data = await res.json();
-      const text = data.choices?.[0]?.message?.content?.trim();
-      if (text) {
-        console.log(`[groq] success with ${name}`);
-        return text;
-      }
-    } catch (err) {
-      console.warn(`[groq] ${name} error: ${err.message}`);
-    }
-  }
-  return null;
-}
-
-/** Gemini models first, then Groq. Returns null if everything fails. */
-async function generateText(prompt) {
-  return (await tryGemini(prompt)) || (await tryGroq(prompt));
-}
+const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-3.5-flash-lite" });
 
 /**
  * Rewrite a message more naturally, grounded ONLY in groundingFacts.
@@ -128,10 +23,7 @@ async function generateText(prompt) {
  * never breaks because of the AI call.
  */
 async function polishMessage(originalMessage, groundingFacts, userText) {
-  if (!originalMessage) return originalMessage;
-  if (!process.env.GEMINI_API_KEY && !process.env.GROQ_API_KEY) {
-    return originalMessage;
-  }
+  if (!process.env.GEMINI_API_KEY || !originalMessage) return originalMessage;
 
   try {
     const prompt = `
@@ -155,15 +47,12 @@ ${originalMessage}
 
 Rewritten message:
 `;
-    const text = await generateText(prompt);
-    if (!text) {
-      console.warn("[polish] all AI providers failed, using original message");
-      return originalMessage;
-    }
-    console.log("[polish] succeeded ✅");
-    return text;
+const result = await model.generateContent(prompt);
+const text = result.response.text().trim();
+console.log("[gemini] polish succeeded ✅");
+return text || originalMessage;
   } catch (err) {
-    console.warn("[polish] failed, using original message:", err.message);
+    console.warn("[gemini] polish failed, using original message:", err.message);
     return originalMessage;
   }
 }
@@ -175,7 +64,6 @@ function queryFrom(text, conversation) {
     .map((m) => m.content);
   return [...prev, text].join(" . ");
 }
-
 async function buildGrounding(query, jsonFallback) {
   try {
     const hits = await retrieve(query);
@@ -189,7 +77,6 @@ async function buildGrounding(query, jsonFallback) {
   }
   return jsonFallback;
 }
-
 async function ragAnswer(question, hits) {
   const context = hits.map((h) => h.text).join("\n---\n");
   const prompt = `You are Insaaf Aasan, a legal complaint assistant for Pakistan.
@@ -203,10 +90,8 @@ ${context}
 
 USER QUESTION:
 ${question}`;
-  const answer = await generateText(prompt);
-  // Throwing is intentional: analyze() catches it and continues the normal flow.
-  if (!answer) throw new Error("all AI providers failed");
-  return answer;
+  const r = await model.generateContent(prompt);
+  return r.response.text().trim();
 }
 
 /**
