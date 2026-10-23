@@ -123,6 +123,33 @@ async function generateText(prompt) {
 }
 
 /**
+ * classification.js recognises which question was asked by matching the
+ * assistant's previous message against the exact original question texts.
+ * Polished (reworded) messages would not match, causing question loops.
+ * So we remember polished -> original and swap it back before classifying.
+ */
+const polishedToOriginal = new Map();
+const keyOf = (t) => String(t || "").replace(/\s+/g, " ").trim();
+
+function rememberPolished(polished, original) {
+  if (!polished || !original || polished === original) return;
+  polishedToOriginal.set(keyOf(polished), original);
+  if (polishedToOriginal.size > 1000) {
+    polishedToOriginal.delete(polishedToOriginal.keys().next().value);
+  }
+}
+
+function restoreOriginals(conversation) {
+  return conversation.map((m) => {
+    if (m && m.role === "assistant" && typeof m.content === "string") {
+      const orig = polishedToOriginal.get(keyOf(m.content));
+      if (orig) return { ...m, content: orig };
+    }
+    return m;
+  });
+}
+
+/**
  * Rewrite a message more naturally, grounded ONLY in groundingFacts.
  * On any failure, silently returns the original message so the app
  * never breaks because of the AI call.
@@ -161,6 +188,7 @@ Rewritten message:
       return originalMessage;
     }
     console.log("[polish] succeeded ✅");
+    rememberPolished(text, originalMessage);
     return text;
   } catch (err) {
     console.warn("[polish] failed, using original message:", err.message);
@@ -215,9 +243,9 @@ ${question}`;
  * builds the result exactly like mock.js does, then polishes `message`.
  */
 async function analyze(text, language, context) {
-  const conversation = (context && Array.isArray(context.conversation))
-    ? context.conversation
-    : [];
+  const conversation = restoreOriginals(
+    (context && Array.isArray(context.conversation)) ? context.conversation : []
+  );
 
   const result = classification.analyzeConversation({ text, conversation });
   const ragQuery = queryFrom(text, conversation);
@@ -257,9 +285,7 @@ async function analyze(text, language, context) {
     }
 
     const baseMessage = result.follow_up_questions[0] || "";
-    // Follow-up questions are NOT reworded: the classifier needs the exact
-    // question text to recognise the user's answer (rewording caused loops).
-    const polished = baseMessage;
+    const polished = await polishMessage(baseMessage, await buildGrounding(ragQuery, "(no category identified yet)"), text);
 
     return {
       category: null,
@@ -313,7 +339,7 @@ async function analyze(text, language, context) {
   // Case 2a: still collecting required facts.
   if (result.message_hint !== "finalize") {
     const baseMessage = result.follow_up_questions[0] || "";
-    const polished = baseMessage; // keep exact question text (see note above)
+    const polished = await polishMessage(baseMessage, groundingFacts, text);
 
     return {
       category: {
